@@ -1,18 +1,31 @@
 """
 Punto de entrada de la app Streamlit.
 
-Se usa el sistema de multipágina nativo de Streamlit (carpeta /pages).
-Cada pantalla de evaluación (Ficha Paciente, y las que se definan con
-Josefa más adelante) vive como un archivo separado en app/pages/.
+Navegacion por pestanas (st.tabs), todo en una sola pagina. El orden
+de las pestanas sigue ORDEN_SECCIONES en utils/estado.py. Si el
+usuario entra a una pestana sin haber completado una anterior, se
+muestra una advertencia (no bloqueante) pero se le deja seguir.
 """
 
 import streamlit as st
 
 from utils.estilos import aplicar_estilos, encabezado
-from utils.estado import inicializar_estado, get_paciente
+from utils.estado import inicializar_estado, ORDEN_SECCIONES, secciones_previas_incompletas
+from secciones import (
+    ficha_paciente,
+    antropometria,
+    calculo_energetico,
+    plan_alimentario,
+    recordatorio_24h,
+    seguimiento,
+    bioquimicos,
+    hidratacion,
+    gestante,
+    resumen,
+)
 
 st.set_page_config(
-    page_title="Evaluación Alimentaria",
+    page_title="Evaluacion Alimentaria",
     page_icon="🥗",
     layout="wide",
 )
@@ -21,20 +34,36 @@ aplicar_estilos()
 inicializar_estado()
 
 encabezado(
-    "🥗 Calculadora de Evaluación Alimentaria",
-    "Completa las secciones desde el menú lateral. Los datos se guardan "
-    "automáticamente mientras navegas entre pantallas.",
+    "🥗 Calculadora de Evaluacion Alimentaria",
+    "Navega libremente entre pestanas. Si falta informacion de un paso "
+    "anterior, veras una advertencia, pero puedes seguir avanzando.",
 )
 
-paciente = get_paciente()
+RENDERERS = {
+    "ficha_paciente": ficha_paciente.mostrar,
+    "antropometria": antropometria.mostrar,
+    "calculo_energetico": calculo_energetico.mostrar,
+    "plan_alimentario": plan_alimentario.mostrar,
+    "recordatorio_24h": recordatorio_24h.mostrar,
+    "seguimiento": seguimiento.mostrar,
+    "bioquimicos": bioquimicos.mostrar,
+    "hidratacion": hidratacion.mostrar,
+    "gestante": gestante.mostrar,
+    "resumen": resumen.mostrar,
+}
 
-st.markdown('<div class="tarjeta">', unsafe_allow_html=True)
-st.subheader("Estado actual")
-if paciente.get("nombre"):
-    st.write(f"Paciente en curso: **{paciente['nombre']}**")
-else:
-    st.write(
-        "Todavía no hay datos ingresados. Empieza por la sección "
-        "**Ficha Paciente** en el menú lateral."
-    )
-st.markdown("</div>", unsafe_allow_html=True)
+titulos = [seccion["titulo"] for seccion in ORDEN_SECCIONES]
+tabs = st.tabs(titulos)
+
+for tab, seccion in zip(tabs, ORDEN_SECCIONES):
+    with tab:
+        faltantes = secciones_previas_incompletas(seccion["id"])
+        if faltantes:
+            st.warning(
+                "Faltan datos en: " + ", ".join(faltantes) + ". "
+                "Puedes completarlos ahora o seguir de todas formas."
+            )
+
+        st.markdown('<div class="tarjeta">', unsafe_allow_html=True)
+        RENDERERS[seccion["id"]]()
+        st.markdown("</div>", unsafe_allow_html=True)
